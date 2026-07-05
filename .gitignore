@@ -1,0 +1,7 @@
+__pycache__/
+build/
+dist/
+msix_build/
+*.spec
+*.msix
+*.exe
