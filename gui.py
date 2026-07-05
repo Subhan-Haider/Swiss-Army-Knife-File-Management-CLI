@@ -6,6 +6,9 @@ import threading
 from organizer import organize_files
 from renamer import batch_rename
 from duplicates import find_duplicates
+from cleaner import remove_empty_folders
+from size_filter import find_large_files
+from flattener import flatten_directory
 
 ctk.set_appearance_mode("System")
 ctk.set_default_color_theme("blue")
@@ -39,10 +42,16 @@ class FileManagerGUI(ctk.CTk):
         self.tab_org = self.tabview.add("Organizer")
         self.tab_ren = self.tabview.add("Renamer")
         self.tab_dup = self.tabview.add("Duplicates")
+        self.tab_clean = self.tabview.add("Cleaner")
+        self.tab_large = self.tabview.add("Large Files")
+        self.tab_flat = self.tabview.add("Flattener")
         
         self.setup_organizer_tab()
         self.setup_renamer_tab()
         self.setup_duplicates_tab()
+        self.setup_cleaner_tab()
+        self.setup_largefiles_tab()
+        self.setup_flattener_tab()
         
         # Log Window
         self.log_label = ctk.CTkLabel(self, text="Console Output:", font=ctk.CTkFont(weight="bold"))
@@ -167,6 +176,101 @@ class FileManagerGUI(ctk.CTk):
         
         print(f"\n--- Starting Duplicate Scan in {directory} (Delete: {delete}, Dry Run: {dry_run}) ---")
         self.run_thread(lambda: find_duplicates(directory, delete, dry_run))
+
+    def setup_cleaner_tab(self):
+        self.clean_dir_var = ctk.StringVar()
+        
+        frame = ctk.CTkFrame(self.tab_clean)
+        frame.pack(fill="x", padx=10, pady=10)
+        
+        ctk.CTkLabel(frame, text="Target Directory:").pack(side="left", padx=10)
+        ctk.CTkEntry(frame, textvariable=self.clean_dir_var, width=300).pack(side="left", padx=10)
+        ctk.CTkButton(frame, text="Browse", command=lambda: self.select_directory(self.clean_dir_var)).pack(side="left", padx=10)
+        
+        self.clean_dry_var = ctk.BooleanVar(value=True)
+        ctk.CTkCheckBox(self.tab_clean, text="Dry Run (Safe Mode)", variable=self.clean_dry_var).pack(pady=10)
+        
+        ctk.CTkButton(self.tab_clean, text="Run Cleaner", command=self.run_cleaner).pack(pady=10)
+        
+    def run_cleaner(self):
+        directory = self.clean_dir_var.get()
+        if not directory:
+            print("Please select a directory first.\n")
+            return
+        dry_run = self.clean_dry_var.get()
+        
+        print(f"\n--- Starting Cleaner in {directory} (Dry Run: {dry_run}) ---")
+        self.run_thread(lambda: remove_empty_folders(directory, dry_run))
+
+    def setup_largefiles_tab(self):
+        self.large_dir_var = ctk.StringVar()
+        
+        frame = ctk.CTkFrame(self.tab_large)
+        frame.pack(fill="x", padx=10, pady=5)
+        
+        ctk.CTkLabel(frame, text="Target Directory:").pack(side="left", padx=10)
+        ctk.CTkEntry(frame, textvariable=self.large_dir_var, width=300).pack(side="left", padx=10)
+        ctk.CTkButton(frame, text="Browse", command=lambda: self.select_directory(self.large_dir_var)).pack(side="left", padx=10)
+        
+        opts_frame = ctk.CTkFrame(self.tab_large)
+        opts_frame.pack(fill="x", padx=10, pady=5)
+        
+        ctk.CTkLabel(opts_frame, text="Min Size (MB):").pack(side="left", padx=10)
+        self.large_min_var = ctk.StringVar(value="50.0")
+        ctk.CTkEntry(opts_frame, textvariable=self.large_min_var, width=100).pack(side="left", padx=10)
+        
+        ctk.CTkLabel(opts_frame, text="Move To (Optional):").pack(side="left", padx=10)
+        self.large_moveto_var = ctk.StringVar()
+        ctk.CTkEntry(opts_frame, textvariable=self.large_moveto_var, width=150).pack(side="left", padx=10)
+        ctk.CTkButton(opts_frame, text="Browse", command=lambda: self.select_directory(self.large_moveto_var)).pack(side="left", padx=10)
+        
+        self.large_dry_var = ctk.BooleanVar(value=True)
+        ctk.CTkCheckBox(self.tab_large, text="Dry Run (Safe Mode)", variable=self.large_dry_var).pack(pady=5)
+        
+        ctk.CTkButton(self.tab_large, text="Find/Move Large Files", command=self.run_largefiles).pack(pady=5)
+        
+    def run_largefiles(self):
+        directory = self.large_dir_var.get()
+        if not directory:
+            print("Please select a directory first.\n")
+            return
+            
+        try:
+            min_size = float(self.large_min_var.get())
+        except ValueError:
+            print("Error: Min Size must be a number.\n")
+            return
+            
+        move_to = self.large_moveto_var.get() or None
+        dry_run = self.large_dry_var.get()
+        
+        print(f"\n--- Starting Large File Finder in {directory} (Min: {min_size}MB, Move To: {move_to}, Dry Run: {dry_run}) ---")
+        self.run_thread(lambda: find_large_files(directory, min_size, move_to, dry_run))
+
+    def setup_flattener_tab(self):
+        self.flat_dir_var = ctk.StringVar()
+        
+        frame = ctk.CTkFrame(self.tab_flat)
+        frame.pack(fill="x", padx=10, pady=10)
+        
+        ctk.CTkLabel(frame, text="Target Directory:").pack(side="left", padx=10)
+        ctk.CTkEntry(frame, textvariable=self.flat_dir_var, width=300).pack(side="left", padx=10)
+        ctk.CTkButton(frame, text="Browse", command=lambda: self.select_directory(self.flat_dir_var)).pack(side="left", padx=10)
+        
+        self.flat_dry_var = ctk.BooleanVar(value=True)
+        ctk.CTkCheckBox(self.tab_flat, text="Dry Run (Safe Mode)", variable=self.flat_dry_var).pack(pady=10)
+        
+        ctk.CTkButton(self.tab_flat, text="Run Flattener", command=self.run_flattener).pack(pady=10)
+        
+    def run_flattener(self):
+        directory = self.flat_dir_var.get()
+        if not directory:
+            print("Please select a directory first.\n")
+            return
+        dry_run = self.flat_dry_var.get()
+        
+        print(f"\n--- Starting Flattener in {directory} (Dry Run: {dry_run}) ---")
+        self.run_thread(lambda: flatten_directory(directory, dry_run))
 
 if __name__ == "__main__":
     app = FileManagerGUI()
